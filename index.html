@@ -86,6 +86,12 @@
       text-transform: uppercase;
     }
 
+    #inputText {
+      min-height: 72px;
+      height: 72px;
+      resize: none;
+    }
+
     textarea:focus {
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.2);
@@ -93,14 +99,14 @@
 
     .controls {
       display: grid;
-      grid-template-columns: repeat(2, minmax(120px, 1fr));
+      grid-template-columns: 1fr;
       gap: 10px;
     }
 
     button {
       border: 0;
       border-radius: 12px;
-      padding: 12px 14px;
+      padding: 24px 14px;
       font-size: 0.98rem;
       font-weight: 700;
       color: #102018;
@@ -188,27 +194,16 @@
       <label style="color: var(--muted); font-size: 0.9rem; margin-top: 8px;">Agent PIN (5 digits):</label>
       <input id="dtmfText" type="password" inputmode="numeric" maxlength="5" spellcheck="false" placeholder="Enter 5 digit PIN (0-9 only)" style="border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(8, 24, 20, 0.8); color: var(--text); padding: 10px 12px; font-size: 1rem; outline: none;">
 
-      <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
-        <input type="checkbox" id="autodialOperator" style="cursor: pointer;">
-        <label for="autodialOperator" style="color: var(--muted); font-size: 0.9rem; cursor: pointer; margin: 0;">Autodial Operator</label>
-      </div>
-
-      <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
-        <input id="autodialDelay" type="number" min="0" step="0.1" value="5" style="width: 88px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(8, 24, 20, 0.8); color: var(--text); padding: 8px 10px; font-size: 0.95rem; outline: none;">
-        <label for="autodialDelay" style="color: var(--muted); font-size: 0.9rem; margin: 0;">Delay After Autodial (seconds)</label>
-      </div>
-
       <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
         <input id="beforeTtyDelay" type="number" min="0" step="0.1" value="0.5" style="width: 88px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(8, 24, 20, 0.8); color: var(--text); padding: 8px 10px; font-size: 0.95rem; outline: none;">
         <label for="beforeTtyDelay" style="color: var(--muted); font-size: 0.9rem; margin: 0;">Delay Before TTY Message (seconds)</label>
       </div>
 
       <label style="color: var(--muted); font-size: 0.9rem; margin-top: 8px;">TTY Message:</label>
-      <textarea id="inputText" spellcheck="false" placeholder="Type optional message here... Unsupported characters are replaced by space." autofocus></textarea>
+      <textarea id="inputText" rows="2" spellcheck="false" placeholder="Type optional message here... Unsupported characters are replaced by space." autofocus></textarea>
 
       <div class="controls">
-        <button id="buildPlayBtn" type="button">Build + Play</button>
-        <button id="downloadBtn" type="button" class="secondary" disabled>Download WAV</button>
+        <button id="buildPlayBtn" type="button">Execute</button>
       </div>
 
       <div id="status" class="status">Ready.</div>
@@ -238,6 +233,7 @@
       const DTMF_TONE_DURATION = 0.1; // 100ms per tone
       const DTMF_SILENCE_DURATION = 0.05; // 50ms silence between tones
       const DTMF_TO_ITA2_DELAY = 0.5; // 500ms delay between DTMF and ITA2
+      const STAR_TO_TTY_DELAY = 0.5; // fixed delay between '*' and TTY audio
 
       const DTMF_FREQS = {
         "1": [697, 1209],
@@ -264,11 +260,8 @@
       const dtmfText = document.getElementById("dtmfText");
       const inputText = document.getElementById("inputText");
       const buildPlayBtn = document.getElementById("buildPlayBtn");
-      const downloadBtn = document.getElementById("downloadBtn");
       const status = document.getElementById("status");
       const player = document.getElementById("player");
-      const autodialOperator = document.getElementById("autodialOperator");
-      const autodialDelay = document.getElementById("autodialDelay");
       const beforeTtyDelay = document.getElementById("beforeTtyDelay");
       let currentBlobUrl = "";
       let lastWavBlob = null;
@@ -555,19 +548,12 @@
 
       function validateForm() {
         const pin = (dtmfText.value || "").trim();
-        const ttyHasText = normalizeInput(inputText.value || "").trim().length > 0;
-
         const pinValid = pin.length === 0 || pin.length === 5;
-        const autodialRuleValid = !(autodialOperator.checked && ttyHasText) || pin.length === 5;
-        const valid = pinValid && autodialRuleValid;
+        const valid = pinValid;
 
         buildPlayBtn.disabled = !valid;
         if (!valid) {
-          if (!pinValid) {
-            setStatus("Agent PIN must be empty or exactly 5 digits.", "warn");
-          } else {
-            setStatus("When Autodial is enabled and TTY message is present, Agent PIN is required.", "warn");
-          }
+          setStatus("Agent PIN must be empty or exactly 5 digits.", "warn");
         } else if (status.classList.contains("warn")) {
           setStatus("Ready.");
         }
@@ -576,52 +562,43 @@
       function buildAudioFromInput() {
         const dtmfInput = dtmfText.value || "";
         const normalized = normalizeInput(inputText.value || "");
-        const autodialDelaySec = parseDelaySeconds(autodialDelay.value, 5);
         const beforeTtyDelaySec = parseDelaySeconds(beforeTtyDelay.value, DTMF_TO_ITA2_DELAY);
 
-        if (!autodialOperator.checked && !dtmfInput.trim() && !normalized.trim()) {
+        if (!dtmfInput.trim() && !normalized.trim()) {
           setStatus("Enter DTMF or ITA2 text first.", "warn");
-          downloadBtn.disabled = true;
           return null;
         }
 
         const allPcm = [];
 
-        // Autodial operator if checkbox is selected
-        if (autodialOperator.checked) {
-          const operatorDtmfPcm = encodeDtmfTones("0756238255");
-          for (let i = 0; i < operatorDtmfPcm.length; i += 1) {
-            allPcm.push(operatorDtmfPcm[i]);
-          }
-
-          // Add configured delay after operator dialing
-          const delaySamples = Math.round(autodialDelaySec * SAMPLE_RATE);
-          for (let i = 0; i < delaySamples; i += 1) {
-            allPcm.push(0);
-          }
-        }
-
-        // Encode DTMF if provided
+        // Encode DTMF PIN if provided
         if (dtmfInput.trim()) {
-          let dtmfToEncode = dtmfInput;
-          if (normalized.trim()) {
-            dtmfToEncode += "*";
+          const pinPcm = encodeDtmfTones(dtmfInput);
+          for (let i = 0; i < pinPcm.length; i += 1) {
+            allPcm.push(pinPcm[i]);
           }
-          const dtmfPcm = encodeDtmfTones(dtmfToEncode);
-          for (let i = 0; i < dtmfPcm.length; i += 1) {
-            allPcm.push(dtmfPcm[i]);
+
+          // If a TTY message is present, insert delay before sending '*'.
+          if (normalized.trim()) {
+            const delaySamples = Math.round(beforeTtyDelaySec * SAMPLE_RATE);
+            for (let i = 0; i < delaySamples; i += 1) {
+              allPcm.push(0);
+            }
+
+            const starPcm = encodeDtmfTones("*");
+            for (let i = 0; i < starPcm.length; i += 1) {
+              allPcm.push(starPcm[i]);
+            }
+
+            const starToTtyDelaySamples = Math.round(STAR_TO_TTY_DELAY * SAMPLE_RATE);
+            for (let i = 0; i < starToTtyDelaySamples; i += 1) {
+              allPcm.push(0);
+            }
           }
         }
 
         // Encode ITA2 if provided
         if (normalized.trim()) {
-          if (allPcm.length > 0) {
-            const delaySamples = Math.round(beforeTtyDelaySec * SAMPLE_RATE);
-            for (let i = 0; i < delaySamples; i += 1) {
-              allPcm.push(0);
-            }
-          }
-
           const encoded = encodeTextToIta2Bits(normalized);
           const itaPcm = renderBitsToPcm(encoded.bits);
           for (let i = 0; i < itaPcm.length; i += 1) {
@@ -648,7 +625,6 @@
           }
 
           lastWavBlob = result.blob;
-          downloadBtn.disabled = false;
 
           disposePreviousUrl();
           currentBlobUrl = URL.createObjectURL(result.blob);
@@ -681,50 +657,21 @@
         }
       });
 
-      downloadBtn.addEventListener("click", function () {
-        if (!lastWavBlob) {
-          setStatus("Build audio first.", "warn");
-          return;
-        }
-
-        disposePreviousUrl();
-        currentBlobUrl = URL.createObjectURL(lastWavBlob);
-
-        const a = document.createElement("a");
-        a.href = currentBlobUrl;
-        a.download = "ita2_50baud.wav";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-
-        setStatus("WAV download started.", "ok");
-      });
-
       function saveToLocalStorage() {
         localStorage.setItem("dtmfInput", dtmfText.value);
         localStorage.setItem("itaInput", inputText.value);
-        localStorage.setItem("autodialOperator", autodialOperator.checked);
-        localStorage.setItem("autodialDelay", autodialDelay.value);
         localStorage.setItem("beforeTtyDelay", beforeTtyDelay.value);
       }
 
       function loadFromLocalStorage() {
         const savedDtmf = localStorage.getItem("dtmfInput");
         const savedIta = localStorage.getItem("itaInput");
-        const savedAutodial = localStorage.getItem("autodialOperator");
-        const savedAutodialDelay = localStorage.getItem("autodialDelay");
         const savedBeforeTtyDelay = localStorage.getItem("beforeTtyDelay");
         if (savedDtmf !== null) {
           dtmfText.value = savedDtmf;
         }
         if (savedIta !== null) {
           inputText.value = savedIta;
-        }
-        if (savedAutodial !== null) {
-          autodialOperator.checked = savedAutodial === "true";
-        }
-        if (savedAutodialDelay !== null) {
-          autodialDelay.value = savedAutodialDelay;
         }
         if (savedBeforeTtyDelay !== null) {
           beforeTtyDelay.value = savedBeforeTtyDelay;
@@ -740,11 +687,6 @@
         saveToLocalStorage();
         validateForm();
       });
-      autodialOperator.addEventListener("change", function () {
-        saveToLocalStorage();
-        validateForm();
-      });
-      autodialDelay.addEventListener("input", saveToLocalStorage);
       beforeTtyDelay.addEventListener("input", saveToLocalStorage);
 
       window.addEventListener("beforeunload", function () {
