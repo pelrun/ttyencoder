@@ -200,6 +200,10 @@
       </div>
 
       <label style="color: var(--muted); font-size: 0.9rem; margin-top: 8px;">TTY Message:</label>
+      <label style="display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.9rem; margin-top: 4px; user-select: none;">
+        <input id="sendTtyEnabled" type="checkbox" checked style="accent-color: var(--accent); width: 16px; height: 16px;">
+        Send TTY Message
+      </label>
       <textarea id="inputText" rows="2" spellcheck="false" placeholder="Type optional message here... Unsupported characters are replaced by space." autofocus></textarea>
 
       <div class="controls">
@@ -263,6 +267,7 @@
       const status = document.getElementById("status");
       const player = document.getElementById("player");
       const beforeTtyDelay = document.getElementById("beforeTtyDelay");
+      const sendTtyEnabled = document.getElementById("sendTtyEnabled");
       let currentBlobUrl = "";
       let lastWavBlob = null;
 
@@ -546,6 +551,13 @@
         return parsed;
       }
 
+      function getNormalizedTtyText() {
+        if (!sendTtyEnabled.checked) {
+          return "";
+        }
+        return normalizeInput(inputText.value || "");
+      }
+
       function validateForm() {
         const pin = (dtmfText.value || "").trim();
         const pinValid = pin.length === 0 || pin.length === 5;
@@ -561,7 +573,7 @@
 
       function buildAudioFromInput() {
         const dtmfInput = dtmfText.value || "";
-        const normalized = normalizeInput(inputText.value || "");
+        const normalized = getNormalizedTtyText();
         const beforeTtyDelaySec = parseDelaySeconds(beforeTtyDelay.value, DTMF_TO_ITA2_DELAY);
 
         if (!dtmfInput.trim() && !normalized.trim()) {
@@ -661,12 +673,14 @@
         localStorage.setItem("dtmfInput", dtmfText.value);
         localStorage.setItem("itaInput", inputText.value);
         localStorage.setItem("beforeTtyDelay", beforeTtyDelay.value);
+        localStorage.setItem("sendTtyEnabled", sendTtyEnabled.checked ? "1" : "0");
       }
 
       function loadFromLocalStorage() {
         const savedDtmf = localStorage.getItem("dtmfInput");
         const savedIta = localStorage.getItem("itaInput");
         const savedBeforeTtyDelay = localStorage.getItem("beforeTtyDelay");
+        const savedSendTtyEnabled = localStorage.getItem("sendTtyEnabled");
         if (savedDtmf !== null) {
           dtmfText.value = savedDtmf;
         }
@@ -675,6 +689,9 @@
         }
         if (savedBeforeTtyDelay !== null) {
           beforeTtyDelay.value = savedBeforeTtyDelay;
+        }
+        if (savedSendTtyEnabled !== null) {
+          sendTtyEnabled.checked = savedSendTtyEnabled !== "0";
         }
       }
 
@@ -688,6 +705,10 @@
         validateForm();
       });
       beforeTtyDelay.addEventListener("input", saveToLocalStorage);
+      sendTtyEnabled.addEventListener("change", function () {
+        saveToLocalStorage();
+        validateForm();
+      });
 
       window.addEventListener("beforeunload", function () {
         disposePreviousUrl();
