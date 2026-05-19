@@ -72,6 +72,78 @@
       padding: 16px 20px 20px;
     }
 
+    .form-label {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 8px;
+    }
+
+    .pin-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .pin-row .form-label {
+      margin-top: 0;
+      margin-bottom: 0;
+      white-space: nowrap;
+    }
+
+    .pin-row .text-input {
+      width: min(320px, 100%);
+    }
+
+    .text-input {
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(8, 24, 20, 0.8);
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    .tty-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 4px;
+    }
+
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      user-select: none;
+    }
+
+    .toggle-checkbox {
+      accent-color: var(--accent);
+      width: 16px;
+      height: 16px;
+    }
+
+    .delay-input {
+      width: 88px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(8, 24, 20, 0.8);
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    .delay-label {
+      margin: 0;
+    }
+
     textarea {
       width: 100%;
       min-height: 190px;
@@ -192,18 +264,20 @@
     </section>
 
     <section class="grid">
-      <label style="color: var(--muted); font-size: 0.9rem; margin-top: 8px;">Agent PIN (5 digits):</label>
-      <input id="dtmfText" type="password" inputmode="numeric" maxlength="5" spellcheck="false" placeholder="Enter 5 digit PIN (0-9 only)" style="border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(8, 24, 20, 0.8); color: var(--text); padding: 10px 12px; font-size: 1rem; outline: none;">
-
-      <label style="color: var(--muted); font-size: 0.9rem; margin-top: 8px;">TTY Message:</label>
-      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 0.9rem; margin-top: 4px;">
-        <label style="display: flex; align-items: center; gap: 8px; margin: 0; user-select: none;">
-          <input id="sendTtyEnabled" type="checkbox" checked style="accent-color: var(--accent); width: 16px; height: 16px;">
-          Send TTY Message
-        </label>
-        <input id="beforeTtyDelay" type="number" min="0" step="0.1" value="0.5" style="width: 88px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(8, 24, 20, 0.8); color: var(--text); padding: 8px 10px; font-size: 0.95rem; outline: none;">
-        <label for="beforeTtyDelay" style="margin: 0;">Delay Before TTY Message (seconds)</label>
+      <div class="pin-row">
+        <label class="form-label" for="dtmfText">Agent PIN (5 digits):</label>
+        <input id="dtmfText" class="text-input" type="password" inputmode="numeric" maxlength="5" spellcheck="false" placeholder="Enter 5 digit PIN (0-9 only)">
       </div>
+
+      <div class="tty-row">
+        <label class="toggle-label">
+          <input id="sendTtyEnabled" class="toggle-checkbox" type="checkbox" checked>
+          Send TTY
+        </label>
+        <input id="beforeTtyDelay" class="delay-input" type="number" min="0" step="0.1" value="0.5">
+        <label for="beforeTtyDelay" class="delay-label">TTY delay (s)</label>
+      </div>
+      <label class="form-label">TTY Message:</label>
       <textarea id="inputText" rows="2" spellcheck="false" placeholder="Type optional message here... Unsupported characters are replaced by space." autofocus></textarea>
 
       <div class="controls">
