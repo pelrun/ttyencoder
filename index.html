@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ITA2 Audio Encoder</title>
+  <style>
+    :root {
+      --bg-a: #0a1f1a;
+      --bg-b: #15342e;
+      --panel: rgba(255, 255, 255, 0.08);
+      --panel-border: rgba(255, 255, 255, 0.16);
+      --text: #f1f7f3;
+      --muted: #b8d0c5;
+      --accent: #ffd166;
+      --accent-2: #ef476f;
+      --ok: #06d6a0;
+      --shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1000px 450px at 90% -10%, rgba(239, 71, 111, 0.24), transparent 60%),
+        radial-gradient(800px 400px at -20% 10%, rgba(6, 214, 160, 0.25), transparent 62%),
+        linear-gradient(150deg, var(--bg-a), var(--bg-b));
+      padding: 20px;
+      display: grid;
+      place-items: center;
+    }
+
+    .app {
+      width: min(920px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+      overflow: hidden;
+    }
+
+    .header {
+      padding: 20px 20px 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.25rem, 2.2vw, 1.8rem);
+      letter-spacing: 0.03em;
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.96rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 16px 20px 20px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 190px;
+      resize: vertical;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(8, 24, 20, 0.8);
+      color: var(--text);
+      padding: 14px;
+      font-size: 1rem;
+      line-height: 1.4;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.2);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(120px, 1fr));
+      gap: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: #102018;
+      background: linear-gradient(180deg, var(--accent), #ffbc3d);
+      cursor: pointer;
+      transition: transform 0.06s ease, filter 0.2s ease;
+    }
+
+    button.secondary {
+      background: linear-gradient(180deg, #d0f4ea, #9ce8d3);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button:disabled {
+      filter: grayscale(0.4);
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .status {
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 0.94rem;
+      color: var(--muted);
+      background: rgba(0, 0, 0, 0.18);
+      min-height: 44px;
+    }
+
+    .status.ok {
+      color: #d7fff3;
+      border-color: rgba(6, 214, 160, 0.6);
+      background: rgba(6, 214, 160, 0.12);
+    }
+
+    .status.warn {
+      color: #fff5da;
+      border-color: rgba(255, 209, 102, 0.7);
+      background: rgba(255, 209, 102, 0.14);
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(140px, 1fr));
+      gap: 8px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .meta div {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.14);
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 2px;
+      border-radius: 8px;
+    }
+
+    .foot {
+      color: var(--muted);
+      font-size: 0.83rem;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 680px) {
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .meta {
+        grid-template-columns: 1fr;
+      }
+
+      body {
+        padding: 12px;
+      }
+
+      .header,
+      .grid {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="header">
+      <h1>ITA2 Text to Audio Encoder</h1>
+      <p class="subtitle">50 baud · Mark 1410 Hz · Stop/Space 1820 Hz</p>
+    </section>
+
+    <section class="grid">
+      <textarea id="inputText" spellcheck="false" placeholder="Type message here... CQ CQ TEST 123"></textarea>
+
+      <div class="controls">
+        <button id="buildPlayBtn" type="button">Build + Play</button>
+        <button id="downloadBtn" type="button" class="secondary" disabled>Download WAV</button>
+      </div>
+
+      <div id="status" class="status">Ready.</div>
+
+      <div class="meta">
+        <div id="charCount">Characters encoded: 0</div>
+        <div id="durationInfo">Audio duration: 0.00 s</div>
+        <div id="bitCount">Bits generated: 0</div>
+        <div id="shiftCount">Shift codes inserted: 0</div>
+      </div>
+
+      <audio id="player" controls preload="none"></audio>
+
+      <p class="foot">
+        ITA2 uses shift states (letters/figures). Unsupported characters are replaced by space.
+        Each character is framed as 1 start bit, 5 data bits (LSB first), and 1.5 stop bits.
+      </p>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const BAUD = 50;
+      const BIT_DURATION = 1 / BAUD;
+      const MARK_FREQ = 1410;
+      const SPACE_FREQ = 1820; // Requested as stop frequency.
+      const SAMPLE_RATE = 44100;
+      const AMPLITUDE = 0.5;
+      const STOP_BITS = 1.5;
+      const LEAD_IN_MARK_BITS = 50; // 1 second idle mark.
+      const TAIL_MARK_BITS = 25; // 0.5 second tail.
+
+      const LTRS_SHIFT_CODE = 0b11111;
+      const FIGS_SHIFT_CODE = 0b11011;
+
+      const inputText = document.getElementById("inputText");
+      const buildPlayBtn = document.getElementById("buildPlayBtn");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const status = document.getElementById("status");
+      const player = document.getElementById("player");
+      const charCount = document.getElementById("charCount");
+      const durationInfo = document.getElementById("durationInfo");
+      const bitCount = document.getElementById("bitCount");
+      const shiftCount = document.getElementById("shiftCount");
+
+      let currentBlobUrl = "";
+      let lastWavBlob = null;
+
+      const LETTERS_TO_CODE = {
+        "\0": 0b00000,
+        "E": 0b00001,
+        "\n": 0b00010,
+        "A": 0b00011,
+        " ": 0b00100,
+        "S": 0b00101,
+        "I": 0b00110,
+        "U": 0b00111,
+        "\r": 0b01000,
+        "D": 0b01001,
+        "R": 0b01010,
+        "J": 0b01011,
+        "N": 0b01100,
+        "F": 0b01101,
+        "C": 0b01110,
+        "K": 0b01111,
+        "T": 0b10000,
+        "Z": 0b10001,
+        "L": 0b10010,
+        "W": 0b10011,
+        "H": 0b10100,
+        "Y": 0b10101,
+        "P": 0b10110,
+        "Q": 0b10111,
+        "O": 0b11000,
+        "B": 0b11001,
+        "G": 0b11010,
+        "M": 0b11100,
+        "X": 0b11101,
+        "V": 0b11110
+      };
+
+      const FIGURES_TO_CODE = {
+        "\0": 0b00000,
+        "3": 0b00001,
+        "\n": 0b00010,
+        "-": 0b00011,
+        " ": 0b00100,
+        "\u0007": 0b00101,
+        "8": 0b00110,
+        "7": 0b00111,
+        "\r": 0b01000,
+        "$": 0b01001,
+        "4": 0b01010,
+        "'": 0b01011,
+        ",": 0b01100,
+        "!": 0b01101,
+        ":": 0b01110,
+        "(": 0b01111,
+        "5": 0b10000,
+        '"': 0b10001,
+        ")": 0b10010,
+        "2": 0b10011,
+        "#": 0b10100,
+        "6": 0b10101,
+        "0": 0b10110,
+        "1": 0b10111,
+        "9": 0b11000,
+        "?": 0b11001,
+        "&": 0b11010,
+        ".": 0b11100,
+        "/": 0b11101,
+        ";": 0b11110
+      };
+
+      function setStatus(message, level) {
+        status.textContent = message;
+        status.className = "status";
+        if (level === "ok") {
+          status.classList.add("ok");
+        } else if (level === "warn") {
+          status.classList.add("warn");
+        }
+      }
+
+      function normalizeInput(text) {
+        return text
+          .replace(/\r\n/g, "\n")
+          .replace(/\r/g, "\n")
+          .toUpperCase();
+      }
+
+      function pushCodeFramedBits(bitArray, code) {
+        bitArray.push(0); // start bit
+        for (let i = 0; i < 5; i += 1) {
+          bitArray.push((code >> i) & 1); // LSB first
+        }
+
+        const stopSamplesBits = STOP_BITS * 2;
+        const fullBits = Math.floor(stopSamplesBits / 2);
+        const hasHalfBit = (stopSamplesBits % 2) !== 0;
+
+        for (let i = 0; i < fullBits; i += 1) {
+          bitArray.push(1);
+        }
+        if (hasHalfBit) {
+          bitArray.push(1.5); // marker for half bit stop
+        }
+      }
+
+      function encodeTextToIta2Bits(text) {
+        const bits = [];
+        let mode = "LTRS";
+        let encodedCharCount = 0;
+        let shiftInserted = 0;
+
+        for (let i = 0; i < LEAD_IN_MARK_BITS; i += 1) {
+          bits.push(1);
+        }
+
+        for (const ch of text) {
+          let charToEncode = ch;
+          if (charToEncode === "\t") {
+            charToEncode = " ";
+          }
+
+          const inLetters = Object.prototype.hasOwnProperty.call(LETTERS_TO_CODE, charToEncode);
+          const inFigures = Object.prototype.hasOwnProperty.call(FIGURES_TO_CODE, charToEncode);
+
+          if (!inLetters && !inFigures) {
+            charToEncode = " ";
+          }
+
+          const canLetters = Object.prototype.hasOwnProperty.call(LETTERS_TO_CODE, charToEncode);
+          const canFigures = Object.prototype.hasOwnProperty.call(FIGURES_TO_CODE, charToEncode);
+
+          let targetMode = mode;
+          if (canLetters && canFigures) {
+            targetMode = mode;
+          } else if (canLetters) {
+            targetMode = "LTRS";
+          } else {
+            targetMode = "FIGS";
+          }
+
+          if (targetMode !== mode) {
+            pushCodeFramedBits(bits, targetMode === "LTRS" ? LTRS_SHIFT_CODE : FIGS_SHIFT_CODE);
+            shiftInserted += 1;
+            mode = targetMode;
+          }
+
+          const code = mode === "LTRS" ? LETTERS_TO_CODE[charToEncode] : FIGURES_TO_CODE[charToEncode];
+          pushCodeFramedBits(bits, code);
+          encodedCharCount += 1;
+        }
+
+        for (let i = 0; i < TAIL_MARK_BITS; i += 1) {
+          bits.push(1);
+        }
+
+        return {
+          bits,
+          encodedCharCount,
+          shiftInserted
+        };
+      }
+
+      function renderBitsToPcm(bits) {
+        let totalSamples = 0;
+        for (const bit of bits) {
+          const duration = bit === 1.5 ? BIT_DURATION / 2 : BIT_DURATION;
+          totalSamples += Math.round(duration * SAMPLE_RATE);
+        }
+
+        const pcm = new Float32Array(totalSamples);
+        let phase = 0;
+        let writeIndex = 0;
+
+        for (const bit of bits) {
+          const duration = bit === 1.5 ? BIT_DURATION / 2 : BIT_DURATION;
+          const sampleCount = Math.round(duration * SAMPLE_RATE);
+
+          const val = bit === 0 ? 0 : 1;
+          const freq = val ? MARK_FREQ : SPACE_FREQ;
+          const step = (2 * Math.PI * freq) / SAMPLE_RATE;
+
+          for (let i = 0; i < sampleCount; i += 1) {
+            pcm[writeIndex++] = Math.sin(phase) * AMPLITUDE;
+            phase += step;
+            if (phase > Math.PI * 2) {
+              phase -= Math.PI * 2;
+            }
+          }
+        }
+
+        return pcm;
+      }
+
+      function encodeWavMono16(pcmFloat32, sampleRate) {
+        const bytesPerSample = 2;
+        const dataSize = pcmFloat32.length * bytesPerSample;
+        const buffer = new ArrayBuffer(44 + dataSize);
+        const view = new DataView(buffer);
+
+        function writeString(offset, str) {
+          for (let i = 0; i < str.length; i += 1) {
+            view.setUint8(offset + i, str.charCodeAt(i));
+          }
+        }
+
+        writeString(0, "RIFF");
+        view.setUint32(4, 36 + dataSize, true);
+        writeString(8, "WAVE");
+        writeString(12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * bytesPerSample, true);
+        view.setUint16(32, bytesPerSample, true);
+        view.setUint16(34, 16, true);
+        writeString(36, "data");
+        view.setUint32(40, dataSize, true);
+
+        let offset = 44;
+        for (let i = 0; i < pcmFloat32.length; i += 1) {
+          const x = Math.max(-1, Math.min(1, pcmFloat32[i]));
+          const sample = x < 0 ? x * 0x8000 : x * 0x7fff;
+          view.setInt16(offset, sample, true);
+          offset += 2;
+        }
+
+        return new Blob([buffer], { type: "audio/wav" });
+      }
+
+      function disposePreviousUrl() {
+        if (currentBlobUrl) {
+          URL.revokeObjectURL(currentBlobUrl);
+          currentBlobUrl = "";
+        }
+      }
+
+      function updateMeta(encodedCharCount, bitsLen, shiftInserted, durationSec) {
+        charCount.textContent = "Characters encoded: " + encodedCharCount;
+        bitCount.textContent = "Bits generated: " + bitsLen;
+        shiftCount.textContent = "Shift codes inserted: " + shiftInserted;
+        durationInfo.textContent = "Audio duration: " + durationSec.toFixed(2) + " s";
+      }
+
+      function buildAudioFromInput() {
+        const normalized = normalizeInput(inputText.value || "");
+        if (!normalized.trim()) {
+          updateMeta(0, 0, 0, 0);
+          setStatus("Enter text first.", "warn");
+          downloadBtn.disabled = true;
+          return null;
+        }
+
+        const encoded = encodeTextToIta2Bits(normalized);
+        const pcm = renderBitsToPcm(encoded.bits);
+        const wavBlob = encodeWavMono16(pcm, SAMPLE_RATE);
+
+        const durationSec = pcm.length / SAMPLE_RATE;
+        updateMeta(encoded.encodedCharCount, encoded.bits.length, encoded.shiftInserted, durationSec);
+
+        return {
+          blob: wavBlob,
+          durationSec,
+          encoded
+        };
+      }
+
+      buildPlayBtn.addEventListener("click", function () {
+        try {
+          const result = buildAudioFromInput();
+          if (!result) {
+            return;
+          }
+
+          lastWavBlob = result.blob;
+          downloadBtn.disabled = false;
+
+          disposePreviousUrl();
+          currentBlobUrl = URL.createObjectURL(result.blob);
+          player.src = currentBlobUrl;
+
+          const playPromise = player.play();
+          if (playPromise && typeof playPromise.then === "function") {
+            playPromise
+              .then(function () {
+                setStatus(
+                  "Encoded and playing at 50 baud (Mark 1410 Hz, Stop/Space 1820 Hz).",
+                  "ok"
+                );
+              })
+              .catch(function () {
+                setStatus(
+                  "Audio created. Tap play on the player if autoplay is blocked.",
+                  "warn"
+                );
+              });
+          } else {
+            setStatus(
+              "Audio created. Use the player controls to play.",
+              "ok"
+            );
+          }
+        } catch (err) {
+          console.error(err);
+          setStatus("Failed to build audio: " + (err && err.message ? err.message : String(err)), "warn");
+        }
+      });
+
+      downloadBtn.addEventListener("click", function () {
+        if (!lastWavBlob) {
+          setStatus("Build audio first.", "warn");
+          return;
+        }
+
+        disposePreviousUrl();
+        currentBlobUrl = URL.createObjectURL(lastWavBlob);
+
+        const a = document.createElement("a");
+        a.href = currentBlobUrl;
+        a.download = "ita2_50baud.wav";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        setStatus("WAV download started.", "ok");
+      });
+
+      window.addEventListener("beforeunload", function () {
+        disposePreviousUrl();
+      });
+
+      inputText.value = "";
+    })();
+  </script>
+</body>
+</html>
