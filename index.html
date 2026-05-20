@@ -265,7 +265,7 @@
 
     <section class="grid">
       <div class="pin-row">
-        <label class="form-label" for="dtmfText">Agent PIN (5 digits):</label>
+        <label class="form-label" for="dtmfText">Agent PIN:</label>
         <input id="dtmfText" class="text-input" type="password" inputmode="numeric" maxlength="5" spellcheck="false" placeholder="Enter 5 digit PIN (0-9 only)">
       </div>
 
@@ -275,7 +275,9 @@
           Send TTY
         </label>
         <input id="beforeTtyDelay" class="delay-input" type="number" min="0" step="0.1" value="0.5">
-        <label for="beforeTtyDelay" class="delay-label">TTY delay (s)</label>
+        <label for="beforeTtyDelay" class="delay-label">Pre-* delay (s)</label>
+        <input id="afterStarDelay" class="delay-input" type="number" min="0" step="0.1" value="0.5">
+        <label for="afterStarDelay" class="delay-label">Post-* delay (s)</label>
       </div>
       <label class="form-label">TTY Message:</label>
       <textarea id="inputText" rows="2" spellcheck="false" placeholder="Type optional message here... Unsupported characters are replaced by space." autofocus></textarea>
@@ -304,14 +306,14 @@
       const SPACE_FREQ = 1820; // Requested as stop frequency.
       const SAMPLE_RATE = 44100;
       const AMPLITUDE = 0.5;
-      const STOP_BITS = 1.5;
+      const STOP_BITS = 2;
       const LEAD_IN_MARK_BITS = 50; // 1 second idle mark.
       const TAIL_MARK_BITS = 25; // 0.5 second tail.
 
       const DTMF_TONE_DURATION = 0.1; // 100ms per tone
       const DTMF_SILENCE_DURATION = 0.05; // 50ms silence between tones
-      const DTMF_TO_ITA2_DELAY = 0.5; // 500ms delay between DTMF and ITA2
-      const STAR_TO_TTY_DELAY = 0.5; // fixed delay between '*' and TTY audio
+      const DTMF_TO_ITA2_DELAY = 2; // default delay before sending '*'
+      const STAR_TO_TTY_DELAY_DEFAULT = 10; // default delay between '*' and TTY audio
 
       const DTMF_FREQS = {
         "1": [697, 1209],
@@ -341,6 +343,7 @@
       const status = document.getElementById("status");
       const player = document.getElementById("player");
       const beforeTtyDelay = document.getElementById("beforeTtyDelay");
+      const afterStarDelay = document.getElementById("afterStarDelay");
       const sendTtyEnabled = document.getElementById("sendTtyEnabled");
       let currentBlobUrl = "";
       let lastWavBlob = null;
@@ -649,6 +652,7 @@
         const dtmfInput = dtmfText.value || "";
         const normalized = getNormalizedTtyText();
         const beforeTtyDelaySec = parseDelaySeconds(beforeTtyDelay.value, DTMF_TO_ITA2_DELAY);
+        const afterStarDelaySec = parseDelaySeconds(afterStarDelay.value, STAR_TO_TTY_DELAY_DEFAULT);
 
         if (!dtmfInput.trim() && !normalized.trim()) {
           setStatus("Enter DTMF or ITA2 text first.", "warn");
@@ -676,7 +680,7 @@
               allPcm.push(starPcm[i]);
             }
 
-            const starToTtyDelaySamples = Math.round(STAR_TO_TTY_DELAY * SAMPLE_RATE);
+            const starToTtyDelaySamples = Math.round(afterStarDelaySec * SAMPLE_RATE);
             for (let i = 0; i < starToTtyDelaySamples; i += 1) {
               allPcm.push(0);
             }
@@ -747,6 +751,7 @@
         localStorage.setItem("dtmfInput", dtmfText.value);
         localStorage.setItem("itaInput", inputText.value);
         localStorage.setItem("beforeTtyDelay", beforeTtyDelay.value);
+        localStorage.setItem("afterStarDelay", afterStarDelay.value);
         localStorage.setItem("sendTtyEnabled", sendTtyEnabled.checked ? "1" : "0");
       }
 
@@ -754,6 +759,7 @@
         const savedDtmf = localStorage.getItem("dtmfInput");
         const savedIta = localStorage.getItem("itaInput");
         const savedBeforeTtyDelay = localStorage.getItem("beforeTtyDelay");
+        const savedAfterStarDelay = localStorage.getItem("afterStarDelay");
         const savedSendTtyEnabled = localStorage.getItem("sendTtyEnabled");
         if (savedDtmf !== null) {
           dtmfText.value = savedDtmf;
@@ -763,6 +769,9 @@
         }
         if (savedBeforeTtyDelay !== null) {
           beforeTtyDelay.value = savedBeforeTtyDelay;
+        }
+        if (savedAfterStarDelay !== null) {
+          afterStarDelay.value = savedAfterStarDelay;
         }
         if (savedSendTtyEnabled !== null) {
           sendTtyEnabled.checked = savedSendTtyEnabled !== "0";
@@ -779,6 +788,7 @@
         validateForm();
       });
       beforeTtyDelay.addEventListener("input", saveToLocalStorage);
+      afterStarDelay.addEventListener("input", saveToLocalStorage);
       sendTtyEnabled.addEventListener("change", function () {
         saveToLocalStorage();
         validateForm();

@@ -29,7 +29,7 @@ EXPECTED = {
     "baud": 50.0,
     "mark_hz": 1410.0,
     "space_hz": 1820.0,
-    "stop_bits": 1.5,
+    "stop_bits": 2,
     "sample_rate": 44100,
     "lead_in_bits": 50,
     "tail_bits": 25,
