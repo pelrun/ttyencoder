@@ -264,26 +264,28 @@
     </section>
 
     <section class="grid">
-      <div class="pin-row">
-        <label class="form-label" for="dtmfText">Agent PIN:</label>
-        <input id="dtmfText" class="text-input" type="password" inputmode="numeric" maxlength="5" spellcheck="false" placeholder="Enter 5 digit PIN (0-9 only)">
+      <div class="controls">
+        <button id="buildPlayBtn" type="button">Execute</button>
       </div>
-
-      <div class="tty-row">
-        <label class="toggle-label">
-          <input id="sendTtyEnabled" class="toggle-checkbox" type="checkbox" checked>
-          Send TTY
+      <div class="pin-row">
+        <label class="toggle-label" for="sendDtmfEnabled" title="Enable Agent PIN">
+          <input id="sendDtmfEnabled" class="toggle-checkbox" type="checkbox" checked>
         </label>
+        <label class="form-label" for="dtmfText">Agent PIN:</label>
+        <input id="dtmfText" class="text-input" type="password" inputmode="numeric" maxlength="5" spellcheck="false" placeholder="Enter 5 digit PIN">
+      </div>
+      <div class="pin-row">
+        <label class="toggle-label" for="sendTtyEnabled" title="Enable TTY Message">
+          <input id="sendTtyEnabled" class="toggle-checkbox" type="checkbox" checked>
+        </label>
+        <label class="form-label" for="inputText">TTY Message:</label>
+      </div>
+      <textarea id="inputText" rows="2" spellcheck="false" placeholder="Type message here... Unsupported characters are replaced by space." autofocus></textarea>
+      <div class="tty-row">
         <input id="beforeTtyDelay" class="delay-input" type="number" min="0" step="0.1" value="0.5">
         <label for="beforeTtyDelay" class="delay-label">Pre-* delay (s)</label>
         <input id="afterStarDelay" class="delay-input" type="number" min="0" step="0.1" value="0.5">
         <label for="afterStarDelay" class="delay-label">Post-* delay (s)</label>
-      </div>
-      <label class="form-label">TTY Message:</label>
-      <textarea id="inputText" rows="2" spellcheck="false" placeholder="Type optional message here... Unsupported characters are replaced by space." autofocus></textarea>
-
-      <div class="controls">
-        <button id="buildPlayBtn" type="button">Execute</button>
       </div>
 
       <div id="status" class="status">Ready.</div>
@@ -345,6 +347,7 @@
       const beforeTtyDelay = document.getElementById("beforeTtyDelay");
       const afterStarDelay = document.getElementById("afterStarDelay");
       const sendTtyEnabled = document.getElementById("sendTtyEnabled");
+      const sendDtmfEnabled = document.getElementById("sendDtmfEnabled");
       let currentBlobUrl = "";
       let lastWavBlob = null;
 
@@ -636,8 +639,9 @@
       }
 
       function validateForm() {
+        const dtmfEnabled = sendDtmfEnabled.checked;
         const pin = (dtmfText.value || "").trim();
-        const pinValid = pin.length === 0 || pin.length === 5;
+        const pinValid = !dtmfEnabled || pin.length === 0 || pin.length === 5;
         const valid = pinValid;
 
         buildPlayBtn.disabled = !valid;
@@ -649,7 +653,7 @@
       }
 
       function buildAudioFromInput() {
-        const dtmfInput = dtmfText.value || "";
+        const dtmfInput = sendDtmfEnabled.checked ? (dtmfText.value || "") : "";
         const normalized = getNormalizedTtyText();
         const beforeTtyDelaySec = parseDelaySeconds(beforeTtyDelay.value, DTMF_TO_ITA2_DELAY);
         const afterStarDelaySec = parseDelaySeconds(afterStarDelay.value, STAR_TO_TTY_DELAY_DEFAULT);
@@ -753,6 +757,7 @@
         localStorage.setItem("beforeTtyDelay", beforeTtyDelay.value);
         localStorage.setItem("afterStarDelay", afterStarDelay.value);
         localStorage.setItem("sendTtyEnabled", sendTtyEnabled.checked ? "1" : "0");
+        localStorage.setItem("sendDtmfEnabled", sendDtmfEnabled.checked ? "1" : "0");
       }
 
       function loadFromLocalStorage() {
@@ -761,6 +766,7 @@
         const savedBeforeTtyDelay = localStorage.getItem("beforeTtyDelay");
         const savedAfterStarDelay = localStorage.getItem("afterStarDelay");
         const savedSendTtyEnabled = localStorage.getItem("sendTtyEnabled");
+        const savedSendDtmfEnabled = localStorage.getItem("sendDtmfEnabled");
         if (savedDtmf !== null) {
           dtmfText.value = savedDtmf;
         }
@@ -776,6 +782,9 @@
         if (savedSendTtyEnabled !== null) {
           sendTtyEnabled.checked = savedSendTtyEnabled !== "0";
         }
+        if (savedSendDtmfEnabled !== null) {
+          sendDtmfEnabled.checked = savedSendDtmfEnabled !== "0";
+        }
       }
 
       dtmfText.addEventListener("input", function () {
@@ -790,6 +799,10 @@
       beforeTtyDelay.addEventListener("input", saveToLocalStorage);
       afterStarDelay.addEventListener("input", saveToLocalStorage);
       sendTtyEnabled.addEventListener("change", function () {
+        saveToLocalStorage();
+        validateForm();
+      });
+      sendDtmfEnabled.addEventListener("change", function () {
         saveToLocalStorage();
         validateForm();
       });
